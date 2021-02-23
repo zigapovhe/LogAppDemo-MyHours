@@ -4,6 +4,7 @@ import 'package:myhours_logapp/Models/Log.dart';
 import 'package:myhours_logapp/components/custom_nav_bar.dart';
 import 'package:myhours_logapp/constraints.dart';
 import 'dart:convert' as convert;
+import 'package:http/http.dart' as http;
 import 'package:table_calendar/table_calendar.dart';
 
 class MainScreen extends StatefulWidget{
@@ -17,7 +18,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
   var accessToken = "";
   DateTime _selectedDay;
   CalendarController _calendarController;
-  List<Log>logData;
+  Future<http.Response> logData;
 
   @override
   void initState() {
@@ -28,14 +29,10 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
       ApiProvider.loginRequest().then((res) {
         final jsonData = convert.jsonDecode(res.toString());
         accessToken = jsonData["accessToken"];
-        ApiProvider.fetchLogs(accessToken, _currentTime).then((logs) {
-          logData = logs;
-        });
+        logData = ApiProvider.fetchLogs(accessToken, _currentTime);
       }).catchError((e) => print("Got error: $e"));
     } else {
-      ApiProvider.fetchLogs(accessToken, _currentTime).then((logs) {
-        logData = logs;
-      });
+      logData = ApiProvider.fetchLogs(accessToken, _currentTime);
     }
   }
 
@@ -60,23 +57,34 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
             onDaySelected: (date, events,holidays) {
               setState(() {
                 _selectedDay = date;
-                ApiProvider.fetchLogs(accessToken, _selectedDay).then((logs) {
-                  logData = logs;
-                });
+                logData = ApiProvider.fetchLogs(accessToken, _selectedDay);
               });
             },
           ),
-          GestureDetector(
-            child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: logData==null ? 0 : logData.length,
-                      itemBuilder: (context, index) {
-                        Log log = logData[index];
-                        return ListTile(
-                          title: Text(log.userId.toString()),
-                        );
-                      }
-                  ),
+          Expanded(
+            child: GestureDetector(
+              child: FutureBuilder(
+                  future: logData,
+                  builder: (_, snapshot) {
+                  if (snapshot.hasData){
+                    List<Log> logs = logsFromJson(snapshot.data.body);
+                    return ListView.builder(
+                        shrinkWrap: true,
+                        itemCount: logs==null ? 0 : logs.length,
+                        itemBuilder: (context, index) {
+                          Log log = logs[index];
+                          return ListTile(
+                            title: Text("Log "+(index+1).toString()),
+                            trailing: Text(log.id.toString()),
+                          );
+                        }
+                    );
+                  }
+                  else {
+                    return SizedBox.shrink();
+                  }
+              }
+              ),
             onHorizontalDragEnd: (DragEndDetails details){
               if(details.primaryVelocity > 0){
                 setState(() {
@@ -89,12 +97,7 @@ class _MainScreenState extends State<MainScreen> with TickerProviderStateMixin {
               }
             },
           ),
-            TextButton(
-              child: Text("Fetch logs"),
-              onPressed: () async {
-                print(_currentTime);
-              },
-            )
+          ),
           ],
         ),
       ),

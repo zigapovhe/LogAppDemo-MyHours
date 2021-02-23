@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
@@ -5,24 +6,21 @@ import 'dart:io';
 import 'Models/Log.dart';
 
 class ApiProvider{
-  static Future<List<Log>> fetchLogs(String authToken, DateTime selectedDay) async {
+  static Future<http.Response> fetchLogs(String authToken, DateTime selectedDay) async {
     var nextDay = DateTime(selectedDay.year, selectedDay.month, selectedDay.day + 1);
-    print(selectedDay);
-    print(nextDay);
+    print("selectedDay: "+selectedDay.toString());
+    print("nextDay:" +nextDay.toString());
     var logRequestURL = "https://mhapitesting2.azurewebsites.net/api/Logs?startIndex=0&step=1&maxDate=$nextDay&date=$selectedDay";
-    final res = await http.get(
+    final res = http.get(
         logRequestURL,
         headers: {
           HttpHeaders.contentTypeHeader: 'application/json',
           HttpHeaders.authorizationHeader: 'Bearer $authToken'
         }
     );
-    if (res.body.isNotEmpty) {
-      List<Log> logs = logsFromJson(res.body);
-      return logs;
-    } else {
-      return <Log>[];
-    }
+    return res.catchError((e){
+      print("Got error: ${e.error}");
+    });
   }
 
   static Future loginRequest() async {
